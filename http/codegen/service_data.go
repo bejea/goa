@@ -1576,7 +1576,7 @@ func buildBodyType(sd *ServiceData, e *httpdesign.EndpointExpr, body, att *desig
 		srcType := att.Type
 		tgtType := body.Type
 		if svr && !req || !svr && !req {
-			// In server and client response type all the field are pointers.
+			// In server and client response ty/home/raphael/go/src/goa.design/goa/http/codegen/service_data.go:1921pe all the field are pointers.
 			// So we need to remove the validations from the body before transform.
 			// We dup the body here so that the validations may be generated for
 			// the response body type.
@@ -1594,10 +1594,9 @@ func buildBodyType(sd *ServiceData, e *httpdesign.EndpointExpr, body, att *desig
 			origin = o[0]
 			srcType = srcObj.Attribute(origin).Type
 			if viewed {
-				src = src + ".Projected." + codegen.Goify(origin, true)
-			} else {
-				src = src + "." + codegen.Goify(origin, true)
+				src += ".Projected"
 			}
+			src += "." + codegen.Goify(origin, true)
 		}
 		var helpers []*codegen.TransformFunctionData
 		if svr && !req && (viewed && origin == "") {
@@ -1863,7 +1862,7 @@ func attributeTypeData(ut design.UserType, req, ptr, server bool, scope *codegen
 }
 
 // projectBodyToViewedResult recursively traverses through a response body and
-// a viewed result type and builds the constructor code to trnasform a response
+// a viewed result type and builds the constructor code to transform a response
 // body to its corresponding viewed result type.
 func projectBodyToViewedResult(resp, vres *design.AttributeExpr, scope *codegen.NameScope, viewspkg string, seenProj map[string][]*service.ProjectData, seen ...map[string]struct{}) (data []*service.ProjectData) {
 	project := func(resp, vres *design.AttributeExpr, seen ...map[string]struct{}) []*service.ProjectData {
@@ -2115,19 +2114,17 @@ func dupAttNoValidation(a *design.AttributeExpr, seen ...map[string]struct{}) *d
 // transformViewedResult transforms a viewed result type to a response body
 // type if unmarshal is set to false. If unmarshal set to true, it unmarshals
 // a response body to the viewed result type.
-func transformViewedResult(srcType, tgtType design.DataType, src, tgt, srcpkg, tgtpkg, view string, unmarshal bool, scope *codegen.NameScope, seen ...map[string]string) (string, []*codegen.TransformFunctionData, error) {
+func transformViewedResult(srcType, tgtType design.DataType, src, tgt, srcpkg, tgtpkg, view string, unmarshal bool, scope *codegen.NameScope) (string, []*codegen.TransformFunctionData, error) {
+	return transformViewedResultR(srcType, tgtType, src, tgt, srcpkg, tgtpkg, view, unmarshal, scope, make(map[string]string))
+}
+func transformViewedResultR(srcType, tgtType design.DataType, src, tgt, srcpkg, tgtpkg, view string, unmarshal bool, scope *codegen.NameScope, s map[string]string) (string, []*codegen.TransformFunctionData, error) {
+	srcType.(design.UserType).Attribute().Debug("SRC")
+	tgtType.(design.UserType).Attribute().Debug("TGT")
 	var (
-		s       map[string]string
 		code    string
 		helpers []*codegen.TransformFunctionData
 		err     error
 	)
-	if len(seen) > 0 {
-		s = seen[0]
-	} else {
-		s = make(map[string]string)
-		seen = append(seen, s)
-	}
 	if c, ok := s[srcType.Name()]; ok {
 		return c, []*codegen.TransformFunctionData{}, nil
 	}
@@ -2162,9 +2159,10 @@ func transformViewedResult(srcType, tgtType design.DataType, src, tgt, srcpkg, t
 	} else {
 		if rt, ok := srcType.(*design.ResultTypeExpr); ok && rt.HasMultipleViews() {
 			srcType = rt.Attribute().Find("projected").Type
-			src = src + ".Projected"
+			src += ".Projected"
 		}
 	}
+	srcType.(design.UserType).Attribute().Debug("SRC TYPE BEFORE DUP")
 	srcType = design.Dup(srcType)
 	sobj := design.AsObject(srcType)
 	obj := &design.Object{}
@@ -2212,7 +2210,7 @@ func transformViewedResult(srcType, tgtType design.DataType, src, tgt, srcpkg, t
 				view = v[0]
 			}
 		}
-		hcode, hhlprs, herr = transformViewedResult(satt.Type, tatt.Type, "v", "res", srcpkg, tgtpkg, view, unmarshal, scope)
+		hcode, hhlprs, herr = transformViewedResultR(satt.Type, tatt.Type, "v", "res", srcpkg, tgtpkg, view, unmarshal, scope, s)
 		if herr != nil {
 			return hcode, hhlprs, herr
 		}

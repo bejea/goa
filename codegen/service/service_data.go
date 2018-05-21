@@ -371,6 +371,7 @@ func (d ServicesData) analyze(service *design.ServiceExpr) *Data {
 			recordError(er)
 		}
 		for _, m := range service.Methods {
+			// collect inner user types
 			patt := m.Payload
 			if ut, ok := patt.Type.(design.UserType); ok {
 				patt = ut.Attribute()
@@ -381,6 +382,7 @@ func (d ServicesData) analyze(service *design.ServiceExpr) *Data {
 				ratt = ut.Attribute()
 			}
 			types = append(types, collectTypes(ratt, seen, scope)...)
+			// collect viewed results and associated projected user types
 			if rt, ok := m.Result.Type.(*design.ResultTypeExpr); ok && rt.HasMultipleViews() {
 				projected := dupAttNoRequired(m.Result)
 				projTypes = append(projTypes, collectProjectedTypes(projected, m.Result, seenProj, scope, viewspkg)...)
@@ -741,11 +743,29 @@ func dupAttNoRequired(a *design.AttributeExpr, seen ...map[string]struct{}) *des
 // collectProjectedTypes collects all the projected types from the given
 // result type and stores them in data.
 func collectProjectedTypes(projected, att *design.AttributeExpr, seen map[string]*ProjectedTypeData, scope *codegen.NameScope, viewspkg string) (data []*ProjectedTypeData) {
+	if prs := collectProjectedTypesR(projected, att, seen, scope, viewspkg); prs != nil {
+		data = append(data, prs...)
+	}
+	if vr := buildViewedResultType(projected, att, scope, viewspkg); vr != nil {
+		seen[vr.Name] = vr
+		projected.Type = vr.Type
+		fmt.Printf("NAME: %#v\n", vr.Name)
+		vr.Type.Attribute().Debug("VIEWED TYPE")
+		data = append(data, vr)
+	}
+	return
+}
+
+func collectProjectedTypesR(projected, att *design.AttributeExpr, seen map[string]*ProjectedTypeData, scope *codegen.NameScope, viewspkg string) (data []*ProjectedTypeData) {
+	projected.Debug("collectProjectedTypesR")
 	collect := func(projected, att *design.AttributeExpr) []*ProjectedTypeData {
-		return collectProjectedTypes(projected, att, seen, scope, viewspkg)
+		return collectProjectedTypesR(projected, att, seen, scope, viewspkg)
 	}
 	switch pt := projected.Type.(type) {
 	case design.UserType:
+		if rt, ok := pt.(*design.ResultTypeExpr); ok && rt.HasMultipleViews() {
+			rt.Rename(rt.Name() + "View")
+		}
 		dt := att.Type.(design.UserType)
 		if _, ok := seen[dt.Name()]; ok {
 			return
@@ -753,11 +773,8 @@ func collectProjectedTypes(projected, att *design.AttributeExpr, seen map[string
 		if pd := buildProjectedType(projected, att, scope, viewspkg); pd != nil {
 			data = append(data, pd)
 			seen[pd.Name] = pd
-		}
-		if vr := buildViewedResultType(att, projected, scope, viewspkg); vr != nil {
-			data = append(data, vr)
-			seen[vr.Name] = vr
-			projected.Type = vr.Type
+			fmt.Printf("NAME: %#v\n", pd.Name)
+			pd.Type.Attribute().Debug("VIEW TYPE")
 		}
 		data = append(data, collect(pt.Attribute(), dt.Attribute())...)
 	case *design.Array:
@@ -784,15 +801,13 @@ func buildProjectedType(projected, att *design.AttributeExpr, scope *codegen.Nam
 	)
 	pt := projected.Type.(design.UserType)
 	rt, isrt := pt.(*design.ResultTypeExpr)
-	switch {
-	case isrt && design.IsArray(pt):
+	if isrt && design.IsArray(pt) {
 		return nil
-	case !isrt || (isrt && !rt.HasMultipleViews()):
-		validate = codegen.RecursiveValidationCode(att, false, true, false, "result")
-	case isrt && rt.HasMultipleViews():
-		pt.Rename(pt.Name() + "View")
 	}
-	varname := scope.GoTypeName(projected)
+	if !isrt || !rt.HasMultipleViews() {
+		validate = codegen.RecursiveValidationCode(att, false, true, false, "result")
+	}
+	varname := scope.GoTypeName(&design.AttributeExpr{Type: pt})
 	return &ProjectedTypeData{
 		UserTypeData: &UserTypeData{
 			Name:        pt.Name(),
@@ -809,56 +824,35 @@ func buildProjectedType(projected, att *design.AttributeExpr, scope *codegen.Nam
 
 // buildViewedResultType builds a viewed result type from the given result type
 // and projected type.
-func buildViewedResultType(att, projected *design.AttributeExpr, scope *codegen.NameScope, viewspkg string) *ProjectedTypeData {
+func buildViewedResultType(projected, att *design.AttributeExpr, scope *codegen.NameScope, viewspkg string) *ProjectedTypeData {
 	rt, isrt := att.Type.(*design.ResultTypeExpr)
 	if !isrt || (isrt && !rt.HasMultipleViews()) {
 		return nil
 	}
 	var (
-		ut           *UserTypeData
-		views        []*ProjectData
-		isCollection bool
+		ut    *UserTypeData
+		views []*ProjectData
+		col   bool
 	)
+	col = design.IsArray(projected.Type)
+	if col {
+		wrapProjected(design.AsArray(projected.Type).ElemType, make(map[*design.AttributeExpr]struct{}))
+	} else {
+		wrapProjected(projected, make(map[*design.AttributeExpr]struct{}))
+	}
 	resvar := scope.GoTypeName(att)
 	desc := fmt.Sprintf("%s is the viewed result type that is projected based on a view.", resvar)
-	isCollection = design.IsArray(projected.Type)
-	if isCollection {
-		prt, _ := projected.Type.(*design.ResultTypeExpr)
-		ut = &UserTypeData{
-			Name:        resvar,
-			Description: desc,
-			VarName:     resvar,
-			Def:         scope.GoTypeDef(rt.Attribute(), true),
-			Ref:         scope.GoTypeRef(projected),
-			Type:        prt,
-		}
-	} else {
-		vrt := &design.ResultTypeExpr{
-			UserTypeExpr: &design.UserTypeExpr{
-				AttributeExpr: &design.AttributeExpr{
-					Type: &design.Object{
-						&design.NamedAttributeExpr{Name: "projected", Attribute: &design.AttributeExpr{Type: projected.Type, Description: "Type to project"}},
-						&design.NamedAttributeExpr{Name: "view", Attribute: &design.AttributeExpr{Type: design.String, Description: "View to render"}},
-					},
-					Validation: &design.ValidationExpr{Required: []string{"projected", "view"}},
-				},
-				TypeName: rt.TypeName,
-			},
-			Identifier: rt.Identifier,
-			Views:      rt.Views,
-		}
-		ut = &UserTypeData{
-			Name:        resvar,
-			Description: desc,
-			VarName:     resvar,
-			Def:         scope.GoTypeDef(vrt.Attribute(), true),
-			Ref:         scope.GoTypeRef(&design.AttributeExpr{Type: vrt}),
-			Type:        vrt,
-		}
+	ut = &UserTypeData{
+		Name:        resvar,
+		Description: desc,
+		VarName:     resvar,
+		Def:         scope.GoTypeDef(projected, true),
+		Ref:         scope.GoTypeRef(projected),
+		Type:        projected.Type.(design.UserType),
 	}
 	views = buildProjectData(att, projected, scope, viewspkg)
 	data := map[string]interface{}{
-		"IsCollection": isCollection,
+		"IsCollection": col,
 		"Views":        views,
 	}
 	var (
@@ -877,7 +871,40 @@ func buildViewedResultType(att, projected *design.AttributeExpr, scope *codegen.
 		ConvertToResult: convertToResult(projected, att, viewspkg, scope),
 		ViewsPkg:        viewspkg,
 		MustValidate:    validate != "",
-		IsCollection:    isCollection,
+		IsCollection:    col,
+	}
+}
+
+func wrapProjected(att *design.AttributeExpr, seen map[*design.AttributeExpr]struct{}) {
+	if _, ok := seen[att]; ok {
+		return
+	}
+	seen[att] = struct{}{}
+	if ar := design.AsArray(att.Type); ar != nil {
+		wrapProjected(ar.ElemType, seen)
+		return
+	}
+	rt, ok := att.Type.(*design.ResultTypeExpr)
+	if ok && rt.HasMultipleViews() {
+		pratt := &design.NamedAttributeExpr{
+			Name:      "projected",
+			Attribute: &design.AttributeExpr{Type: rt, Description: "Type to project"},
+		}
+		prview := &design.NamedAttributeExpr{
+			Name:      "view",
+			Attribute: &design.AttributeExpr{Type: design.String, Description: "View to render"},
+		}
+		att.Type = &design.ResultTypeExpr{
+			UserTypeExpr: &design.UserTypeExpr{
+				AttributeExpr: &design.AttributeExpr{
+					Type:       &design.Object{pratt, prview},
+					Validation: &design.ValidationExpr{Required: []string{"projected", "view"}},
+				},
+				TypeName: att.Type.Name(),
+			},
+			Identifier: rt.Identifier,
+			Views:      rt.Views,
+		}
 	}
 }
 
@@ -887,8 +914,8 @@ func buildViewedResultType(att, projected *design.AttributeExpr, scope *codegen.
 func buildProjectData(att, projected *design.AttributeExpr, scope *codegen.NameScope, viewspkg string) []*ProjectData {
 	rt := att.Type.(*design.ResultTypeExpr)
 	var (
-		defaultv *ProjectData
-		views    []*ProjectData
+		def   *ProjectData
+		views []*ProjectData
 	)
 	views = make([]*ProjectData, 0, len(rt.Views))
 	vobj := design.AsObject(projected.Type)
@@ -918,12 +945,12 @@ func buildProjectData(att, projected *design.AttributeExpr, scope *codegen.NameS
 			// loop so that it is the last item in the list. It is easier this
 			// way to default the validation logic to the "default" view if the
 			// "view" attribute is not set in the viewed result type.
-			defaultv = pd
+			def = pd
 			continue
 		}
 		views = append(views, pd)
 	}
-	views = append(views, defaultv)
+	views = append(views, def)
 	return views
 }
 
