@@ -3,10 +3,15 @@
 // storage views
 //
 // Command:
-// $ goa gen goa.design/goa/examples/cellar/design -o
-// $(GOPATH)/src/goa.design/goa/examples/cellar
+// $ goa gen goa.design/goa/examples/cellar/design
 
 package views
+
+import (
+	"unicode/utf8"
+
+	goa "goa.design/goa"
+)
 
 // StoredBottleView is a type that runs validations on a projected type.
 type StoredBottleView struct {
@@ -26,8 +31,51 @@ type StoredBottleView struct {
 	Rating *uint32
 }
 
+// WineryView is a type that runs validations on a projected type.
+type WineryView struct {
+	// Name of winery
+	Name *string
+	// Region of winery
+	Region *string
+	// Country of winery
+	Country *string
+	// Winery website URL
+	URL *string
+}
+
+// Component is a type that runs validations on a projected type.
+type Component struct {
+	// Grape varietal
+	Varietal *string
+	// Percentage of varietal in wine
+	Percentage *uint32
+}
+
 // StoredBottle is the viewed result type that is projected based on a view.
-type StoredBottle StoredBottle
+type StoredBottle StoredBottleView
+
+// Validate runs the validations defined on Component.
+func (result *Component) Validate() (err error) {
+	if result.Varietal != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("result.varietal", *result.Varietal, "[A-Za-z' ]+"))
+	}
+	if result.Varietal != nil {
+		if utf8.RuneCountInString(*result.Varietal) > 100 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("result.varietal", *result.Varietal, utf8.RuneCountInString(*result.Varietal), 100, false))
+		}
+	}
+	if result.Percentage != nil {
+		if *result.Percentage < 1 {
+			err = goa.MergeErrors(err, goa.InvalidRangeError("result.percentage", *result.Percentage, 1, true))
+		}
+	}
+	if result.Percentage != nil {
+		if *result.Percentage > 100 {
+			err = goa.MergeErrors(err, goa.InvalidRangeError("result.percentage", *result.Percentage, 100, false))
+		}
+	}
+	return
+}
 
 // Validate runs the validations defined on StoredBottle.
 func (result *StoredBottle) Validate() (err error) {

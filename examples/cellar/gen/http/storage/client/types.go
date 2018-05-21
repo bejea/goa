@@ -3,8 +3,7 @@
 // storage HTTP client types
 //
 // Command:
-// $ goa gen goa.design/goa/examples/cellar/design -o
-// $(GOPATH)/src/goa.design/goa/examples/cellar
+// $ goa gen goa.design/goa/examples/cellar/design
 
 package client
 
@@ -248,9 +247,10 @@ func NewShowNotFound(body *ShowNotFoundResponseBody) *storage.NotFound {
 	return v
 }
 
-// NewShowResponseBodyToStoredBottleDefault projects response body
-// ShowResponseBody into viewed result type StoredBottle using the default view.
-func NewShowResponseBodyToStoredBottleDefault(res *ShowResponseBody) *storageviews.StoredBottle {
+// NewShowResponseBodyToStoredBottleViewDefault projects response body
+// ShowResponseBody into viewed result type StoredBottleView using the default
+// view.
+func NewShowResponseBodyToStoredBottleViewDefault(res *ShowResponseBody) *storageviews.StoredBottleView {
 	vres := &storageviews.StoredBottleView{
 		ID:          res.ID,
 		Name:        res.Name,
@@ -268,43 +268,23 @@ func NewShowResponseBodyToStoredBottleDefault(res *ShowResponseBody) *storagevie
 		}
 	}
 	if res.Winery != nil {
-		vres.Winery = NewWineryResponseBodyToWineryTiny(res.Winery)
+		vres.Winery = NewWineryResponseBodyToWineryViewTiny(res.Winery)
 	}
-	return &storageviews.StoredBottle{vres, "default"}
+	return &storageviews.StoredBottleView{vres, "default"}
 }
 
-// NewShowResponseBodyToStoredBottleTiny projects response body
-// ShowResponseBody into viewed result type StoredBottle using the tiny view.
-func NewShowResponseBodyToStoredBottleTiny(res *ShowResponseBody) *storageviews.StoredBottle {
+// NewShowResponseBodyToStoredBottleViewTiny projects response body
+// ShowResponseBody into viewed result type StoredBottleView using the tiny
+// view.
+func NewShowResponseBodyToStoredBottleViewTiny(res *ShowResponseBody) *storageviews.StoredBottleView {
 	vres := &storageviews.StoredBottleView{
 		ID:   res.ID,
 		Name: res.Name,
 	}
 	if res.Winery != nil {
-		vres.Winery = NewWineryResponseBodyToWineryTiny(res.Winery)
+		vres.Winery = NewWineryResponseBodyToWineryViewTiny(res.Winery)
 	}
-	return &storageviews.StoredBottle{vres, "tiny"}
-}
-
-// NewWineryResponseBodyToWineryDefault projects response body
-// WineryResponseBody into viewed result type Winery using the default view.
-func NewWineryResponseBodyToWineryDefault(res *WineryResponseBody) *storageviews.Winery {
-	vres := &storageviews.WineryView{
-		Name:    res.Name,
-		Region:  res.Region,
-		Country: res.Country,
-		URL:     res.URL,
-	}
-	return &storageviews.Winery{vres, "default"}
-}
-
-// NewWineryResponseBodyToWineryTiny projects response body WineryResponseBody
-// into viewed result type Winery using the tiny view.
-func NewWineryResponseBodyToWineryTiny(res *WineryResponseBody) *storageviews.Winery {
-	vres := &storageviews.WineryView{
-		Name: res.Name,
-	}
-	return &storageviews.Winery{vres, "tiny"}
+	return &storageviews.StoredBottleView{vres, "tiny"}
 }
 
 // Validate runs the validations defined on ListResponseBody

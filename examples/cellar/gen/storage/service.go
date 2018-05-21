@@ -3,8 +3,7 @@
 // storage service
 //
 // Command:
-// $ goa gen goa.design/goa/examples/cellar/design -o
-// $(GOPATH)/src/goa.design/goa/examples/cellar
+// $ goa gen goa.design/goa/examples/cellar/design
 
 package storage
 
@@ -177,13 +176,13 @@ func NewStoredBottle(vres *storageviews.StoredBottle) *StoredBottle {
 // NewStoredBottleTiny projects result type StoredBottle into viewed result
 // type StoredBottle using the tiny view.
 func NewStoredBottleTiny(res *StoredBottle) *storageviews.StoredBottle {
-	vres := &storageviews.StoredBottle{}
+	vres := &storageviews.StoredBottleView{}
 	return &storageviews.StoredBottle{vres, "tiny"}
 }
 
 // NewStoredBottleDefault projects result type StoredBottle into viewed result
 // type StoredBottle using the default view.
 func NewStoredBottleDefault(res *StoredBottle) *storageviews.StoredBottle {
-	vres := &storageviews.StoredBottle{}
+	vres := &storageviews.StoredBottleView{}
 	return &storageviews.StoredBottle{vres, "default"}
 }

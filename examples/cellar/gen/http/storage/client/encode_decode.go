@@ -3,8 +3,7 @@
 // storage HTTP client encoders and decoders
 //
 // Command:
-// $ goa gen goa.design/goa/examples/cellar/design -o
-// $(GOPATH)/src/goa.design/goa/examples/cellar
+// $ goa gen goa.design/goa/examples/cellar/design
 
 package client
 
@@ -156,9 +155,9 @@ func DecodeShowResponse(decoder func(*http.Response) goahttp.Decoder, restoreBod
 			view = resp.Header.Get("goa-view")
 			switch view {
 			case "default", "":
-				vres = NewShowResponseBodyToStoredBottleDefault(&body)
+				vres = NewShowResponseBodyToStoredBottleViewDefault(&body)
 			case "tiny":
-				vres = NewShowResponseBodyToStoredBottleTiny(&body)
+				vres = NewShowResponseBodyToStoredBottleViewTiny(&body)
 			default:
 				return nil, goahttp.ErrValidationError("storage", "show", fmt.Errorf("unknown goa-view in header %q", view))
 			}

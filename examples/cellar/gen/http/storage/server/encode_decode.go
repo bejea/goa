@@ -3,8 +3,7 @@
 // storage HTTP server encoders and decoders
 //
 // Command:
-// $ goa gen goa.design/goa/examples/cellar/design -o
-// $(GOPATH)/src/goa.design/goa/examples/cellar
+// $ goa gen goa.design/goa/examples/cellar/design
 
 package server
 
@@ -302,14 +301,14 @@ func marshalWineryTinyToWineryTinyResponseBody(v *storage.WineryTiny) *WineryTin
 	return res
 }
 
-// marshalViewedWineryToWineryResponseBody builds a value of type
-// *WineryResponseBody from a value of type *storageviews.Winery.
-func marshalViewedWineryToWineryResponseBody(v *storageviews.Winery) *WineryResponseBody {
+// marshalViewedWineryViewToWineryResponseBody builds a value of type
+// *WineryResponseBody from a value of type *storageviews.WineryView.
+func marshalViewedWineryViewToWineryResponseBody(v *storageviews.WineryView) *WineryResponseBody {
 	res := &WineryResponseBody{
-		Name:    v.Projected.Name,
-		Region:  v.Projected.Region,
-		Country: v.Projected.Country,
-		URL:     v.Projected.URL,
+		Name:    v.Name,
+		Region:  v.Region,
+		Country: v.Country,
+		URL:     v.URL,
 	}
 	return res
 }

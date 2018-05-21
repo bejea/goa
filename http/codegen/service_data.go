@@ -1865,6 +1865,8 @@ func attributeTypeData(ut design.UserType, req, ptr, server bool, scope *codegen
 // a viewed result type and builds the constructor code to transform a response
 // body to its corresponding viewed result type.
 func projectBodyToViewedResult(resp, vres *design.AttributeExpr, scope *codegen.NameScope, viewspkg string, seenProj map[string][]*service.ProjectData, seen ...map[string]struct{}) (data []*service.ProjectData) {
+	resp.Debug("BODY")
+	vres.Debug("VIEWED")
 	project := func(resp, vres *design.AttributeExpr, seen ...map[string]struct{}) []*service.ProjectData {
 		return projectBodyToViewedResult(resp, vres, scope, viewspkg, seenProj, seen...)
 	}
@@ -1888,19 +1890,19 @@ func projectBodyToViewedResult(resp, vres *design.AttributeExpr, scope *codegen.
 				vt = vres.Find("projected").Type.(design.UserType)
 			}
 		}
-		data = append(data, project(dt.Attribute(), vt.Attribute(), seen...)...)
+		// data = append(data, project(dt.Attribute(), vt.Attribute(), seen...)...)
 	case *design.Array:
 		vt := vres.Type.(*design.Array)
 		data = append(data, project(dt.ElemType, vt.ElemType, seen...)...)
-	case *design.Map:
-		vt := vres.Type.(*design.Map)
-		data = append(data, project(dt.KeyType, vt.KeyType, seen...)...)
-		data = append(data, project(dt.ElemType, vt.ElemType, seen...)...)
-	case *design.Object:
-		vt := vres.Type.(*design.Object)
-		for _, n := range *dt {
-			data = append(data, project(n.Attribute, vt.Attribute(n.Name), seen...)...)
-		}
+		// case *design.Map:
+		// 	vt := vres.Type.(*design.Map)
+		// 	data = append(data, project(dt.KeyType, vt.KeyType, seen...)...)
+		// 	data = append(data, project(dt.ElemType, vt.ElemType, seen...)...)
+		// case *design.Object:
+		// 	vt := vres.Type.(*design.Object)
+		// 	for _, n := range *dt {
+		// 		data = append(data, project(n.Attribute, vt.Attribute(n.Name), seen...)...)
+		// 	}
 	}
 	return
 }
@@ -2118,6 +2120,7 @@ func transformViewedResult(srcType, tgtType design.DataType, src, tgt, srcpkg, t
 	return transformViewedResultR(srcType, tgtType, src, tgt, srcpkg, tgtpkg, view, unmarshal, scope, make(map[string]string))
 }
 func transformViewedResultR(srcType, tgtType design.DataType, src, tgt, srcpkg, tgtpkg, view string, unmarshal bool, scope *codegen.NameScope, s map[string]string) (string, []*codegen.TransformFunctionData, error) {
+	fmt.Printf("UNMARSHAL: %#v\n", unmarshal)
 	srcType.(design.UserType).Attribute().Debug("SRC")
 	tgtType.(design.UserType).Attribute().Debug("TGT")
 	var (
@@ -2158,8 +2161,11 @@ func transformViewedResultR(srcType, tgtType design.DataType, src, tgt, srcpkg, 
 		}
 	} else {
 		if rt, ok := srcType.(*design.ResultTypeExpr); ok && rt.HasMultipleViews() {
-			srcType = rt.Attribute().Find("projected").Type
-			src += ".Projected"
+			st := rt.Attribute().Find("projected")
+			if st != nil {
+				srcType = st.Type
+				src += ".Projected"
+			}
 		}
 	}
 	srcType.(design.UserType).Attribute().Debug("SRC TYPE BEFORE DUP")

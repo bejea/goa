@@ -3,8 +3,7 @@
 // storage HTTP server types
 //
 // Command:
-// $ goa gen goa.design/goa/examples/cellar/design -o
-// $(GOPATH)/src/goa.design/goa/examples/cellar
+// $ goa gen goa.design/goa/examples/cellar/design
 
 package server
 
@@ -162,7 +161,7 @@ func NewListResponseBody(res storage.StoredBottleTinyCollection) ListResponseBod
 
 // NewShowResponseBody builds the HTTP response body from the result of the
 // "show" endpoint of the "storage" service.
-func NewShowResponseBody(res *storageviews.StoredBottle) *ShowResponseBody {
+func NewShowResponseBody(res *storageviews.StoredBottleView) *ShowResponseBody {
 	body := &ShowResponseBody{
 		ID:          res.Projected.ID,
 		Name:        res.Projected.Name,
@@ -180,7 +179,7 @@ func NewShowResponseBody(res *storageviews.StoredBottle) *ShowResponseBody {
 		}
 	}
 	if res.Projected.Winery != nil {
-		body.Winery = marshalViewedWineryToWineryResponseBody(res.Projected.Winery)
+		body.Winery = marshalViewedWineryViewToWineryResponseBody(res.Projected.Winery)
 	}
 	return body
 }
